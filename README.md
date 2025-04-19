@@ -34,20 +34,81 @@ cdspeedctl --device /dev/sr0 --speed 1
 
 ## Building
 
-### From Source
+### From Source (Native or Cross Environment)
+
+Ensure build dependencies (e.g. `gcc`, `make`) are installed.
 
 ```bash
 make
 sudo make install
 ```
 
+#### Overriding Compiler Flags
+
+To build for a specific architecture (e.g. ARMv6 hard-float):
+
+```bash
+export CFLAGS="-O2 -march=armv6 -mfpu=vfp -mfloat-abi=hard -marm"
+make
+```
+
+You will see a summary like:
+
+```text
+[+] Building cdspeedctl with CC=gcc and CFLAGS=-O2 -march=armv6 -mfpu=vfp -mfloat-abi=hard -marm
+```
+
+### Verifying Output
+
+You can confirm architecture and float ABI using:
+
+```bash
+file cdspeedctl
+readelf -A cdspeedctl | grep Tag_ABI
+```
+
+Example output for ARMv6 hard-float:
+
+```text
+cdspeedctl: ELF 32-bit LSB executable, ARM, EABI5, hard-float
+Tag_ABI_HardFP_use: Yes
+```
+
+
 ### Packaging `.deb` (Debian/Ubuntu/Raspbian)
+
+Builds a local Debian package:
 
 ```bash
 dpkg-buildpackage -b -us -uc
 ```
 
-This produces a `.deb` in the parent directory.
+This outputs `.deb` files in the parent directory (`../`).
+
+
+### Docker-Based Cross-Architecture Packaging
+
+To produce `.deb` packages for all target platforms (ARMv6, ARMv7, ARM64, AMD64):
+
+```bash
+./build-matrix.sh --volumio --verbose
+```
+
+This:
+
+- Uses isolated Docker containers per target
+- Copies source + packaging to `build/cdspeedctl/source/`
+- Runs `dpkg-buildpackage` inside each container
+- Outputs `.deb` packages to `out/<arch>/`
+
+Renamed outputs for Volumio convention:
+
+| Arch     | Original `.deb` Suffix | Renamed Suffix  |
+|----------|-------------------------|------------------|
+| armv6    | `_armhf.deb`            | `_arm.deb`       |
+| armhf    | `_armhf.deb`            | `_armv7.deb`     |
+| arm64    | `_arm64.deb`            | `_armv8.deb`     |
+| amd64    | `_amd64.deb`            | `_x64.deb`       |
 
 
 ## Example Integration
