@@ -1,0 +1,15 @@
+Source: cdspeedctl
+Section: utils
+Priority: optional
+Maintainer: Your Name <you@example.com>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 4.5.0
+Homepage: https://github.com/yourusername/cdspeedctl
+
+Package: cdspeedctl
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Universal CD-ROM speed limiter for whisper-quiet audio playback
+ A lightweight utility to limit CD-ROM read speed using ioctl or raw SCSI commands.
+ Designed for low-power systems with USB optical drives, ideal for bit-perfect
+ playback with minimal mechanical noise.

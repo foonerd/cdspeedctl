@@ -1,0 +1,5 @@
+#!/usr/bin/make -f
+# Simple rules file for building cdspeedctl
+
+%:
+	dh $@
