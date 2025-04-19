@@ -1,6 +1,6 @@
 // cdspeedctl.c - Universal CD-ROM speed control utility
 // License: MIT or BSD-style
-// Author: Your Name
+// Author: Andrew Seredyn
 
 #include <stdio.h>
 #include <stdlib.h>
