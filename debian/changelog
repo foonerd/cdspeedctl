@@ -1,4 +1,4 @@
-cdspeedctl (0.1-1) unstable; urgency=medium
+cdspeedctl (0.1-1~buster1) buster; urgency=medium
 
   * Initial release.
 

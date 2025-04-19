@@ -3,3 +3,6 @@
 
 %:
 	dh $@
+
+override_dh_dwz:
+	@echo "[+] Skipping dh_dwz to avoid failure on stripped binaries"
