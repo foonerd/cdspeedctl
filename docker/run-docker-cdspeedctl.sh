@@ -40,6 +40,16 @@ if [[ ! -f "$DOCKERFILE" ]]; then
   exit 1
 fi
 
+# Clean previous build staging area
+rm -rf build/$COMPONENT/source
+mkdir -p build/$COMPONENT/source
+mkdir -p out/$ARCH
+
+# Copy project files to isolated build area
+cp -r src build/$COMPONENT/source/
+cp -r debian build/$COMPONENT/source/
+cp -f Makefile build/$COMPONENT/source/
+
 echo "[+] Building Docker image for $ARCH ($PLATFORM)..."
 if [[ "$VERBOSE" -eq 1 ]]; then
   DOCKER_BUILDKIT=1 docker build --platform=$PLATFORM --progress=plain -t $IMAGE_TAG -f $DOCKERFILE .
@@ -49,27 +59,48 @@ fi
 
 echo "[+] Running build for $COMPONENT in Docker ($ARCH)..."
 if [[ "$ARCH" == "armv6" ]]; then
-  docker run --rm --platform=$PLATFORM -v "$PWD":/build -w /build $IMAGE_TAG bash -c "    export CFLAGS='-O2 -march=armv6 -mfpu=vfp -mfloat-abi=hard -marm' &&     export CXXFLAGS=\"\$CFLAGS\" &&     dpkg-buildpackage -us -uc -b"
+  docker run --rm --platform=$PLATFORM -v "$PWD":/build -w /build/build/$COMPONENT/source $IMAGE_TAG bash -c '\
+    export CFLAGS="-O2 -march=armv6 -mfpu=vfp -mfloat-abi=hard -marm" && \
+    export CXXFLAGS="$CFLAGS" && \
+    dpkg-buildpackage -us -uc -b'
 else
-  docker run --rm --platform=$PLATFORM -v "$PWD":/build -w /build $IMAGE_TAG bash -c "    dpkg-buildpackage -us -uc -b"
+  docker run --rm --platform=$PLATFORM -v "$PWD":/build -w /build/build/$COMPONENT/source $IMAGE_TAG bash -c "\
+    dpkg-buildpackage -us -uc -b"
 fi
 
-mkdir -p out/$ARCH
-find . -maxdepth 1 -type f -name '*.deb' -exec mv {} out/$ARCH/ \;
+# Move .deb files out of build tree into persistent output dir
+# find build/$COMPONENT -maxdepth 1 -type f -name '*.deb' -exec mv {} out/$ARCH/ \;
 
+# Volumio-specific renaming rules
 if [[ "$MODE" == "volumio" ]]; then
   echo "[+] Volumio mode: Renaming .deb packages for custom suffixes..."
   for f in out/$ARCH/*.deb; do
-    if [[ "$f" == *_all.deb ]]; then continue; fi
+    [[ "$f" == *_all.deb ]] && continue
     base_name=$(basename "$f")
-    newf="$f"
+    new_name="$base_name"
+
     case "$ARCH" in
-      armv6)  newf="${f/_armhf.deb/_arm.deb}" ;;
-      armhf)  newf="${f/_armhf.deb/_armv7.deb}" ;;
-      arm64)  newf="${f/_arm64.deb/_armv8.deb}" ;;
-      amd64)  newf="${f/_amd64.deb/_x64.deb}" ;;
+      armv6)
+        new_name="${base_name/_armhf.deb/_arm.deb}"
+        [[ "$base_name" != "$new_name" ]] && echo "[VERBOSE] Renaming to $new_name (ARMv6/7 target VFP2 - hard-float)"
+        ;;
+      armhf)
+        new_name="${base_name/_armhf.deb/_armv7.deb}"
+        [[ "$base_name" != "$new_name" ]] && echo "[VERBOSE] Renaming to $new_name (ARMv7 target)"
+        ;;
+      arm64)
+        new_name="${base_name/_arm64.deb/_armv8.deb}"
+        [[ "$base_name" != "$new_name" ]] && echo "[VERBOSE] Renaming to $new_name (ARMv8 target)"
+        ;;
+      amd64)
+        new_name="${base_name/_amd64.deb/_x64.deb}"
+        [[ "$base_name" != "$new_name" ]] && echo "[VERBOSE] Renaming to $new_name (x86_64 target)"
+        ;;
     esac
-    if [[ "$f" != "$newf" ]]; then mv "$f" "$newf"; fi
+
+    if [[ "$base_name" != "$new_name" ]]; then
+      mv "out/$ARCH/$base_name" "out/$ARCH/$new_name"
+    fi
   done
 fi
 
