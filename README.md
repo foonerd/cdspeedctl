@@ -111,6 +111,14 @@ Renamed outputs for Volumio convention:
 | amd64    | `_amd64.deb`            | `_x64.deb`       |
 
 
+##  Cleaning
+
+To remove all build artifacts, intermediate files, and `.deb` outputs:
+
+```bash
+./clean-all.sh
+```
+
 ## Example Integration
 
 Use as a pre-step to CD audio playback in scripts or services:
