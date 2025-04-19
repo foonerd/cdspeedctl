@@ -69,7 +69,7 @@ else
 fi
 
 # Move .deb files out of build tree into persistent output dir
-# find build/$COMPONENT -maxdepth 1 -type f -name '*.deb' -exec mv {} out/$ARCH/ \;
+find build/$COMPONENT -maxdepth 1 -type f -name '*.deb' -exec mv {} out/$ARCH/ \;
 
 # Volumio-specific renaming rules
 if [[ "$MODE" == "volumio" ]]; then
