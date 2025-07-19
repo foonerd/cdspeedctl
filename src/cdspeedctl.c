@@ -16,12 +16,12 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 
-#define VERSION "0.1"
+#define VERSION "0.2"
 #define DEFAULT_DEVICE "/dev/sr0"
 #define DEFAULT_SG      NULL
 #define RETRY_DELAY_SEC 1
 
-static const char *short_opts = "d:s:g:r:qvh";
+static const char *short_opts = "d:s:g:r:qvhc";
 static const struct option long_opts[] = {
     {"device",  required_argument, 0, 'd'},
     {"speed",   required_argument, 0, 's'},
@@ -29,13 +29,15 @@ static const struct option long_opts[] = {
     {"retry",   required_argument, 0, 'r'},
     {"quiet",   no_argument,       0, 'q'},
     {"verbose", no_argument,       0, 'v'},
+    {"current", no_argument,       0, 'c'},
     {"help",    no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
+// Usage message
 void usage(const char *prog) {
     fprintf(stderr,
-        "Usage: %s --device /dev/srX --speed N [--sg /dev/sgX] [--retry N] [--quiet|--verbose]\n"
+        "Usage: %s --device /dev/srX --speed N [--sg /dev/sgX] [--retry N] [--quiet|--verbose] [-c]\n"
         "Options:\n"
         "  -d, --device   CD-ROM device (default: /dev/sr0)\n"
         "  -s, --speed    Speed (e.g., 1, 2, 4)\n"
@@ -43,9 +45,31 @@ void usage(const char *prog) {
         "  -r, --retry    Retry seconds if device not ready\n"
         "  -q, --quiet    Suppress output except fatal errors\n"
         "  -v, --verbose  Verbose debug output\n"
+        "  -c, --current  Get the current speed of the CD-ROM drive\n"
         "  -h, --help     Show this help\n", prog);
 }
 
+// Function to get the current speed using ioctl (CDROM_GET_SPEED)
+int get_speed_ioctl(const char *device, bool verbose) {
+    int fd = open(device, O_RDONLY | O_NONBLOCK);
+    if (fd < 0) {
+        if (verbose) perror("open ioctl device");
+        return -1;
+    }
+
+    int speed;
+    if (ioctl(fd, CDROM_GET_SPEED, &speed) == 0) {
+        if (verbose) printf("Current speed: %d\n", speed);
+        close(fd);
+        return speed;
+    }
+
+    if (verbose) perror("CDROM_GET_SPEED failed");
+    close(fd);
+    return -1;
+}
+
+// Function to set speed using ioctl (CDROM_SELECT_SPEED)
 int set_speed_ioctl(const char *device, int speed, bool verbose) {
     int fd = open(device, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
@@ -66,6 +90,7 @@ int set_speed_ioctl(const char *device, int speed, bool verbose) {
     return -1;
 }
 
+// Function to set speed using SG_IO (SCSI interface)
 int set_speed_sgio(const char *sg_device, int speed, bool verbose) {
     int fd = open(sg_device, O_RDWR);
     if (fd < 0) {
@@ -110,6 +135,52 @@ int set_speed_sgio(const char *sg_device, int speed, bool verbose) {
     return 0;
 }
 
+// Retry logic for setting speed
+int retry_set_speed(const char *device, int speed, int retries, bool verbose) {
+    int attempts = 0;
+    int result = -1;
+
+    while (attempts < retries) {
+        if (verbose) {
+            printf("[+] Attempt %d to set speed to %d...\n", attempts + 1, speed);
+        }
+
+        // Try setting speed with ioctl first
+        result = set_speed_ioctl(device, speed, verbose);
+        if (result == 0) {
+            if (verbose) {
+                printf("[+] Speed set successfully on attempt %d\n", attempts + 1);
+            }
+            break;
+        }
+
+        // If ioctl fails, fallback to SG_IO
+        if (result != 0 && sg_device) {
+            if (set_speed_sgio(sg_device, speed, verbose) == 0) {
+                if (verbose) {
+                    printf("[+] Speed set successfully using SG_IO on attempt %d\n", attempts + 1);
+                }
+                break;
+            }
+        }
+
+        attempts++;
+        sleep(RETRY_DELAY_SEC);  // wait before retrying
+    }
+
+    // After retries, check if it was successful
+    if (result == 0) {
+        get_speed_ioctl(device, verbose);  // report current speed after success
+    } else {
+        if (verbose) {
+            fprintf(stderr, "[+] Failed to set speed after %d attempts\n", retries);
+        }
+    }
+
+    return result;
+}
+
+// Main function
 int main(int argc, char **argv) {
     const char *device = DEFAULT_DEVICE;
     const char *sg_device = DEFAULT_SG;
@@ -117,6 +188,7 @@ int main(int argc, char **argv) {
     int retry_seconds = 0;
     bool quiet = false;
     bool verbose = false;
+    bool get_speed = false;
 
     int opt;
     while ((opt = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1) {
@@ -127,11 +199,21 @@ int main(int argc, char **argv) {
             case 'r': retry_seconds = atoi(optarg); break;
             case 'q': quiet = true; break;
             case 'v': verbose = true; break;
+            case 'c': get_speed = true; break;  // current speed flag
             case 'h': usage(argv[0]); return 64;
             default: usage(argv[0]); return 64;
         }
     }
 
+    // Check for the -c flag (current speed request)
+    if (get_speed) {
+        if (get_speed_ioctl(device, verbose) < 0) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // Validate speed
     if (!speed || speed < 1) {
         if (!quiet) fprintf(stderr, "Error: --speed must be specified and > 0\n");
         return 64;
@@ -141,7 +223,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i <= retry_seconds; i++) {
         int fd = open(device, O_RDONLY | O_NONBLOCK);
         if (fd >= 0) {
-            close(fd);
+            close(fd); // Device is ready, proceed
             break;
         }
         if (i == retry_seconds) {
@@ -151,14 +233,10 @@ int main(int argc, char **argv) {
         sleep(RETRY_DELAY_SEC);
     }
 
-    // Try ioctl first
-    if (set_speed_ioctl(device, speed, verbose) == 0) return 0;
-
-    // Fallback to SG_IO
-    if (sg_device) {
-        if (set_speed_sgio(sg_device, speed, verbose) == 0) return 0;
+    // Try setting speed with retries
+    if (retry_set_speed(device, speed, retry_seconds ? retry_seconds : 3, verbose) == 0) {
+        return 0;
     }
 
-    if (!quiet) fprintf(stderr, "Failed to set speed on any interface\n");
-    return 2;
+    return 2;  // Failure after retries
 }
