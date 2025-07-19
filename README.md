@@ -28,6 +28,7 @@ cdspeedctl --device /dev/sr0 --speed 1
 | `-r`, `--retry`   | Retry for N seconds if device not immediately available |
 | `-q`, `--quiet`   | Suppress all non-error output                           |
 | `-v`, `--verbose` | Enable debug output                                     |
+| `-c`, `--current` | Get the current speed of the CD-ROM drive               |
 | `-h`, `--help`    | Display usage                                           |
 
 ## Building
@@ -122,6 +123,21 @@ Use as a pre-step to CD audio playback in scripts or services:
 cdspeedctl --device /dev/sr0 --sg /dev/sg1 --speed 1 --retry 5 --quiet
 cdparanoia -B
 ```
+
+Alternatively, if you want to verify the current speed before playback:
+
+```bash
+cdspeedctl --device /dev/sr0 --current
+cdspeedctl --device /dev/sr0 --sg /dev/sg1 --speed 1 --retry 5 --quiet
+cdparanoia -B
+```
+
+This ensures that:
+
+1. The current speed is queried first (if needed).
+2. The speed is set via `cdspeedctl`.
+3. **`cdparanoia -B`** is used for the actual playback or rip operation.
+
 
 ## Return Codes
 
