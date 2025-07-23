@@ -12,7 +12,6 @@
 - Minimal resource footprint (no background daemons or polling)
 - Designed for **bit-perfect playback with reduced drive noise**
 
-
 ## Usage
 
 ```bash
@@ -21,16 +20,16 @@ cdspeedctl --device /dev/sr0 --speed 1
 
 ### Options
 
-| Option             | Description                                                  |
-|--------------------|--------------------------------------------------------------|
-| `-d`, `--device`   | Target CD-ROM block device (default: `/dev/sr0`)             |
-| `-s`, `--speed`    | Speed multiplier (e.g., `1`, `2`, `4`)                       |
-| `-g`, `--sg`       | Optional SCSI generic device for fallback (`/dev/sgX`)       |
-| `-r`, `--retry`    | Retry for N seconds if device not immediately available      |
-| `-q`, `--quiet`    | Suppress all non-error output                                |
-| `-v`, `--verbose`  | Enable debug output                                          |
-| `-h`, `--help`     | Display usage                                                |
-
+| Option            | Description                                             |
+| ----------------- | ------------------------------------------------------- |
+| `-d`, `--device`  | Target CD-ROM block device (default: `/dev/sr0`)        |
+| `-s`, `--speed`   | Speed multiplier (e.g., `1`, `2`, `4`)                  |
+| `-g`, `--sg`      | Optional SCSI generic device for fallback (`/dev/sgX`)  |
+| `-r`, `--retry`   | Retry for N seconds if device not immediately available |
+| `-q`, `--quiet`   | Suppress all non-error output                           |
+| `-v`, `--verbose` | Enable debug output                                     |
+| `-c`, `--current` | Get the current speed of the CD-ROM drive               |
+| `-h`, `--help`    | Display usage                                           |
 
 ## Building
 
@@ -74,7 +73,6 @@ cdspeedctl: ELF 32-bit LSB executable, ARM, EABI5, hard-float
 Tag_ABI_HardFP_use: Yes
 ```
 
-
 ### Packaging `.deb` (Debian/Ubuntu/Raspbian)
 
 Builds a local Debian package:
@@ -84,7 +82,6 @@ dpkg-buildpackage -b -us -uc
 ```
 
 This outputs `.deb` files in the parent directory (`../`).
-
 
 ### Docker-Based Cross-Architecture Packaging
 
@@ -96,22 +93,21 @@ To produce `.deb` packages for all target platforms (ARMv6, ARMv7, ARM64, AMD64)
 
 This:
 
-- Uses isolated Docker containers per target
-- Copies source + packaging to `build/cdspeedctl/source/`
-- Runs `dpkg-buildpackage` inside each container
-- Outputs `.deb` packages to `out/<arch>/`
+* Uses isolated Docker containers per target
+* Copies source + packaging to `build/cdspeedctl/source/`
+* Runs `dpkg-buildpackage` inside each container
+* Outputs `.deb` packages to `out/<arch>/`
 
 Renamed outputs for Volumio convention:
 
-| Arch     | Original `.deb` Suffix | Renamed Suffix  |
-|----------|-------------------------|------------------|
-| armv6    | `_armhf.deb`            | `_arm.deb`       |
-| armhf    | `_armhf.deb`            | `_armv7.deb`     |
-| arm64    | `_arm64.deb`            | `_armv8.deb`     |
-| amd64    | `_amd64.deb`            | `_x64.deb`       |
+| Arch  | Original `.deb` Suffix | Renamed Suffix |
+| ----- | ---------------------- | -------------- |
+| armv6 | `_armhf.deb`           | `_arm.deb`     |
+| armhf | `_armhf.deb`           | `_armv7.deb`   |
+| arm64 | `_arm64.deb`           | `_armv8.deb`   |
+| amd64 | `_amd64.deb`           | `_x64.deb`     |
 
-
-##  Cleaning
+## Cleaning
 
 To remove all build artifacts, intermediate files, and `.deb` outputs:
 
@@ -128,29 +124,51 @@ cdspeedctl --device /dev/sr0 --sg /dev/sg1 --speed 1 --retry 5 --quiet
 cdparanoia -B
 ```
 
+Alternatively, if you want to verify the current speed before playback:
+
+```bash
+cdspeedctl --device /dev/sr0 --current
+cdspeedctl --device /dev/sr0 --sg /dev/sg1 --speed 1 --retry 5 --quiet
+cdparanoia -B
+```
+
+This ensures that:
+
+1. The current speed is queried first (if needed).
+2. The speed is set via `cdspeedctl`.
+3. **`cdparanoia -B`** is used for the actual playback or rip operation.
+
+
 ## Return Codes
 
-| Code | Meaning                              |
-|------|--------------------------------------|
-| 0    | Speed set successfully               |
-| 1    | Device or media not ready            |
-| 2    | Speed setting unsupported            |
-| 3    | General or unknown error             |
-| 64+  | Invalid argument or usage error      |
-
+| Code | Meaning                         |
+| ---- | ------------------------------- |
+| 0    | Speed set successfully          |
+| 1    | Device or media not ready       |
+| 2    | Speed setting unsupported       |
+| 3    | General or unknown error        |
+| 64+  | Invalid argument or usage error |
 
 ## License
 
 MIT or BSD-style license. See `LICENSE` file for details.
 
-
 ## Future Work
 
-- Auto-detection of `/dev/sgX` mapping
-- Optional `udev` hook generator
-- Query current drive speed (if supported)
+* Auto-detection of `/dev/sgX` mapping
+* Optional `udev` hook generator
+* Query current drive speed (if supported)
 
 ## Maintainer
 
-Just a Nerd  
+Just a Nerd
 GitHub: [github.com/foonerd](https://github.com/foonerd)
+
+---
+
+### Key Updates:
+1. **Added the `-c` flag** for querying the current speed of the CD-ROM drive.
+2. **Retained original functionality** and options like `-s` for setting speed and retry logic.
+3. **Cleaned up** the formatting and ensured all features are clearly documented. 
+
+
