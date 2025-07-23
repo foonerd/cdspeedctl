@@ -16,6 +16,10 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 
+#ifndef CDROM_GET_SPEED
+#define CDROM_GET_SPEED 0x5323
+#endif
+
 #define VERSION "0.2"
 #define DEFAULT_DEVICE "/dev/sr0"
 #define DEFAULT_SG      NULL
@@ -136,7 +140,7 @@ int set_speed_sgio(const char *sg_device, int speed, bool verbose) {
 }
 
 // Retry logic for setting speed
-int retry_set_speed(const char *device, int speed, int retries, bool verbose) {
+int retry_set_speed(const char *device, const char *sg_device, int speed, int retries, bool verbose) {
     int attempts = 0;
     int result = -1;
 
@@ -160,6 +164,7 @@ int retry_set_speed(const char *device, int speed, int retries, bool verbose) {
                 if (verbose) {
                     printf("[+] Speed set successfully using SG_IO on attempt %d\n", attempts + 1);
                 }
+                result = 0;
                 break;
             }
         }
@@ -234,7 +239,7 @@ int main(int argc, char **argv) {
     }
 
     // Try setting speed with retries
-    if (retry_set_speed(device, speed, retry_seconds ? retry_seconds : 3, verbose) == 0) {
+    if (retry_set_speed(device, sg_device, speed, retry_seconds ? retry_seconds : 3, verbose) == 0) {
         return 0;
     }
 
